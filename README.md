@@ -1,4 +1,4 @@
-# Background Studio · C# WPF 1.2
+# Background Studio · C# WPF 1.3
 
 Windows에서 이미지와 동영상 배경을 로컬로 제거하고 편집하는 .NET 10 WPF
 앱입니다. 파일은 외부 AI API로 전송하지 않습니다.
@@ -17,11 +17,13 @@ Windows에서 이미지와 동영상 배경을 로컬로 제거하고 편집하�
 - 투명 WebM/MOV 또는 MP4/WebM/MOV/GIF
 - 여러 파일 대기열, 순차 변환, 취소, 재대기, 결과 기록
 - 자동 결과 저장, 출력 폴더·선택 결과 열기, 모델/FFmpeg 상태
+- 선택 작업마다 분리 원본에서 다시 계산하는 비파괴 편집 히스토리
+- 초기 상태·필터·위치·색·마스크 기록을 클릭해 즉시 비교
 
 ## Windows EXE
 
 [GitHub Releases](https://github.com/ko9ma7/background-studio-wpf/releases)에서
-`BackgroundStudio-WPF-v1.2.0-win-x64.zip`을 내려받아 압축을 풀고
+`BackgroundStudio-WPF-v1.3.0-win-x64.zip`을 내려받아 압축을 풀고
 `BackgroundStudio.exe`를 실행합니다. 이 배포본은 .NET 런타임을 포함하므로
 .NET SDK나 FFmpeg를 따로 설치할 필요가 없습니다. ZIP 옆의 `.sha256` 파일로
 다운로드 무결성을 확인할 수 있습니다.
@@ -47,12 +49,17 @@ Essentials ZIP을 `%LOCALAPPDATA%\BackgroundStudio\ffmpeg\`에 내려받습니�
 1. `이미지 추가` 또는 `동영상 추가`로 여러 파일을 대기열에 넣습니다.
 2. 투명·단색·다른 이미지·블러 중 결과 배경 하나를 고릅니다.
 3. 상단 탭에서 필터·외곽, 위치·크기, 고급 색·마스크 값을 조절합니다.
-4. `대기열 전체 변환`을 누릅니다.
-5. 완료 파일은 `사진\Background Studio`에 자동 저장되고 결과 목록에 남습니다.
+4. 미리보기 아래 `편집 히스토리`에서 이전 상태를 클릭해 비교합니다.
+5. `대기열 전체 변환`을 누릅니다.
+6. 완료 파일은 `사진\Background Studio`에 자동 저장되고 결과 목록에 남습니다.
 
 저장 대화상자를 처리 도중 열지 않습니다. `저장·결과` 탭에서 출력 폴더를
 바꾸고, 선택 결과 또는 폴더를 바로 열 수 있습니다. 새 작업은 `전체 초기화`,
 잘못 넣은 항목은 `선택 삭제`로 정리합니다.
+
+필터를 연달아 바꾸더라도 앞 결과 위에 다시 필터를 덧씌우지 않습니다. 앱이
+분리 원본과 알파 마스크를 보관하고 각 히스토리 값을 그 원본에 다시 적용합니다.
+히스토리 선택은 비교 미리보기이며, 저장하려면 해당 상태에서 다시 변환합니다.
 
 ## 빌드와 테스트
 
@@ -82,7 +89,14 @@ dotnet publish BackgroundStudio.csproj -c Release -r win-x64 `
 외부 구성요소는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), 디자인
 판단은 [`docs/design-direction.md`](docs/design-direction.md)에 정리했습니다.
 전문 편집값은 [`docs/pro-editing-guide.md`](docs/pro-editing-guide.md)를
-확인하세요.
+확인하세요. 화면별 사용법과 저장 흐름은
+[`docs/user-guide.md`](docs/user-guide.md)에 있습니다.
+
+## 세 가지 버전 선택
+
+- 설치 없이 브라우저에서 처리: [Web](https://github.com/ko9ma7/background-studio-web)
+- Windows GUI와 자동 저장: 현재 C# WPF 버전
+- Windows GUI + CLI/API/서버 자동화: [Python](https://github.com/ko9ma7/background-studio-python)
 
 ## License
 

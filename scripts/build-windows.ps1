@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $releaseRoot = Join-Path $projectRoot "release"
-$packageName = "BackgroundStudio-WPF-v1.2.0-win-x64"
+$packageName = "BackgroundStudio-WPF-v1.3.0-win-x64"
 $packageFolder = Join-Path $releaseRoot $packageName
 $zipPath = Join-Path $releaseRoot "$packageName.zip"
 $resolvedReleaseRoot = [IO.Path]::GetFullPath($releaseRoot) + [IO.Path]::DirectorySeparatorChar

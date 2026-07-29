@@ -131,13 +131,90 @@
                 <TextBlock Text="처리 완료 결과는 자동으로 출력 폴더에 저장됩니다."
                            Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" />
               </StackPanel>
+              <Border x:Name="HistoryPanel"
+                      VerticalAlignment="Bottom"
+                      Margin="12"
+                      Padding="10"
+                      CornerRadius="12"
+                      BorderBrush="#B7C9BF"
+                      BorderThickness="1"
+                      Background="#F4FFFEFA"
+                      Visibility="Collapsed">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="편집 히스토리" FontWeight="Bold" FontSize="12" />
+                    <TextBlock Text="분리 원본 기준 · 클릭해서 비교"
+                               Margin="0,3,0,0"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="10" />
+                  </StackPanel>
+                  <ListBox x:Name="HistoryList"
+                           Grid.Column="1"
+                           Height="46"
+                           BorderThickness="0"
+                           Background="Transparent"
+                           ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                           ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                           SelectionChanged="HistoryList_SelectionChanged">
+                    <ListBox.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" />
+                      </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemContainerStyle>
+                      <Style TargetType="ListBoxItem">
+                        <Setter Property="AutomationProperties.Name" Value="{Binding Label}" />
+                        <Setter Property="Padding" Value="11,7" />
+                        <Setter Property="Margin" Value="0,0,6,0" />
+                        <Setter Property="Background" Value="White" />
+                        <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                        <Setter Property="BorderBrush" Value="#D9DFDB" />
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Setter Property="Template">
+                          <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                              <Border Padding="{TemplateBinding Padding}"
+                                      Background="{TemplateBinding Background}"
+                                      BorderBrush="{TemplateBinding BorderBrush}"
+                                      BorderThickness="{TemplateBinding BorderThickness}"
+                                      CornerRadius="9">
+                                <ContentPresenter />
+                              </Border>
+                              <ControlTemplate.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                  <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+                                  <Setter Property="Foreground" Value="White" />
+                                  <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                </Trigger>
+                              </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                          </Setter.Value>
+                        </Setter>
+                      </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Label}" FontSize="10" FontWeight="SemiBold" />
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Grid>
+              </Border>
             </Grid>
           </Border>
         </Grid>
       </Border>
 
       <Border Grid.Column="4" Background="{StaticResource SurfaceBrush}" CornerRadius="16" Padding="14">
-        <TabControl x:Name="EditorTabs">
+        <TabControl x:Name="EditorTabs"
+                    SelectionChanged="EditorTabs_SelectionChanged"
+                    PreviewMouseUp="EditorTabs_PreviewMouseUp"
+                    PreviewKeyUp="EditorTabs_PreviewKeyUp"
+                    LostKeyboardFocus="EditorTabs_LostKeyboardFocus">
           <TabItem Header="배경">
             <StackPanel Margin="8,14,8,8">
               <TextBlock Text="결과 배경" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,5" />
