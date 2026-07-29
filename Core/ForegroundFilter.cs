@@ -8,5 +8,10 @@ public enum ForegroundFilter
     Warm,
     Cool,
     Grayscale,
-    Comic
+    Comic,
+    HighContrast,
+    Posterize,
+    Sepia,
+    Invert,
+    Pencil
 }

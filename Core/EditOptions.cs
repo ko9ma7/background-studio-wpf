@@ -17,4 +17,15 @@ public sealed record EditOptions(
     double SubjectOffsetY,
     bool AutoCenter,
     int OutlineWidth,
-    string OutlineColor);
+    string OutlineColor,
+    double Brightness,
+    double Contrast,
+    double Saturation,
+    double Temperature,
+    double Hue,
+    double ForegroundOpacity,
+    double Rotation,
+    bool FlipHorizontal,
+    bool FlipVertical,
+    int MaskExpansion,
+    CanvasAspect CanvasAspect);

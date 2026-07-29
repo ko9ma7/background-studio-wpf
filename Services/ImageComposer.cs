@@ -17,8 +17,7 @@ public static class ImageComposer
         EditOptions options,
         BitmapSource? background)
     {
-        var width = original.PixelWidth;
-        var height = original.PixelHeight;
+        var (width, height) = CanvasSize(original.PixelWidth, original.PixelHeight, options.CanvasAspect);
         var foregroundSource = PrepareForeground(cutout, options);
         if (options.RenderMode == RenderMode.Mask)
         {
@@ -56,10 +55,12 @@ public static class ImageComposer
         var foreground = new Image
         {
             Source = foregroundSource,
-            Width = width,
-            Height = height,
+            Width = original.PixelWidth,
+            Height = original.PixelHeight,
             Stretch = Stretch.Fill
         };
+        Canvas.SetLeft(foreground, (width - original.PixelWidth) / 2.0);
+        Canvas.SetTop(foreground, (height - original.PixelHeight) / 2.0);
         if (options.ShadowBlur > 0 || options.ShadowOffsetX != 0 || options.ShadowOffsetY != 0)
         {
             foreground.Effect = new DropShadowEffect
@@ -91,7 +92,9 @@ public static class ImageComposer
 
     public static BitmapSource PrepareForeground(BitmapSource cutout, EditOptions options)
     {
-        var filtered = ApplyFilter(cutout, options.ForegroundFilter);
+        var filtered = ApplyAdjustments(
+            ApplyFilter(cutout, options.ForegroundFilter),
+            options);
         var box = AlphaBounds(filtered);
         if (box.IsEmpty)
         {
@@ -114,8 +117,12 @@ public static class ImageComposer
                 Children =
                 {
                     new ScaleTransform(
-                        options.SubjectScale,
-                        options.SubjectScale,
+                        options.SubjectScale * (options.FlipHorizontal ? -1 : 1),
+                        options.SubjectScale * (options.FlipVertical ? -1 : 1),
+                        box.X + box.Width / 2,
+                        box.Y + box.Height / 2),
+                    new RotateTransform(
+                        options.Rotation,
                         box.X + box.Width / 2,
                         box.Y + box.Height / 2),
                     new TranslateTransform(translateX, translateY)
@@ -277,6 +284,35 @@ public static class ImageComposer
                             red = green = blue = 24;
                         }
                         break;
+                    case ForegroundFilter.HighContrast:
+                        red = Scale(red, 1.45, -58);
+                        green = Scale(green, 1.45, -58);
+                        blue = Scale(blue, 1.45, -58);
+                        break;
+                    case ForegroundFilter.Posterize:
+                        red = (byte)(red / 64 * 64);
+                        green = (byte)(green / 64 * 64);
+                        blue = (byte)(blue / 64 * 64);
+                        break;
+                    case ForegroundFilter.Sepia:
+                        var sepiaRed = Math.Clamp(0.393 * red + 0.769 * green + 0.189 * blue, 0, 255);
+                        var sepiaGreen = Math.Clamp(0.349 * red + 0.686 * green + 0.168 * blue, 0, 255);
+                        var sepiaBlue = Math.Clamp(0.272 * red + 0.534 * green + 0.131 * blue, 0, 255);
+                        red = (byte)sepiaRed;
+                        green = (byte)sepiaGreen;
+                        blue = (byte)sepiaBlue;
+                        break;
+                    case ForegroundFilter.Invert:
+                        red = (byte)(255 - red);
+                        green = (byte)(255 - green);
+                        blue = (byte)(255 - blue);
+                        break;
+                    case ForegroundFilter.Pencil:
+                        var pencil = IsStrongEdge(original, stride, converted.PixelWidth, converted.PixelHeight, x, y)
+                            ? (byte)28
+                            : (byte)245;
+                        red = green = blue = pencil;
+                        break;
                 }
                 pixels[index] = blue;
                 pixels[index + 1] = green;
@@ -294,6 +330,111 @@ public static class ImageComposer
             stride);
         result.Freeze();
         return result;
+    }
+
+    private static BitmapSource ApplyAdjustments(BitmapSource source, EditOptions options)
+    {
+        var converted = ConvertToBgra32(source);
+        var stride = converted.PixelWidth * 4;
+        var pixels = new byte[stride * converted.PixelHeight];
+        converted.CopyPixels(pixels, stride, 0);
+        var alpha = new byte[converted.PixelWidth * converted.PixelHeight];
+        var hue = options.Hue * Math.PI / 180;
+        var cos = Math.Cos(hue);
+        var sin = Math.Sin(hue);
+        for (var y = 0; y < converted.PixelHeight; y++)
+        {
+            for (var x = 0; x < converted.PixelWidth; x++)
+            {
+                var index = y * stride + x * 4;
+                var red = pixels[index + 2] / 255.0;
+                var green = pixels[index + 1] / 255.0;
+                var blue = pixels[index] / 255.0;
+                var luminance = red * 0.299 + green * 0.587 + blue * 0.114;
+                red = luminance + (red - luminance) * options.Saturation;
+                green = luminance + (green - luminance) * options.Saturation;
+                blue = luminance + (blue - luminance) * options.Saturation;
+                red = (red - 0.5) * options.Contrast + 0.5 + options.Brightness - 1;
+                green = (green - 0.5) * options.Contrast + 0.5 + options.Brightness - 1;
+                blue = (blue - 0.5) * options.Contrast + 0.5 + options.Brightness - 1;
+                red += options.Temperature * 0.12;
+                blue -= options.Temperature * 0.12;
+                var hueRed = (.213 + cos * .787 - sin * .213) * red
+                    + (.715 - cos * .715 - sin * .715) * green
+                    + (.072 - cos * .072 + sin * .928) * blue;
+                var hueGreen = (.213 - cos * .213 + sin * .143) * red
+                    + (.715 + cos * .285 + sin * .140) * green
+                    + (.072 - cos * .072 - sin * .283) * blue;
+                var hueBlue = (.213 - cos * .213 - sin * .787) * red
+                    + (.715 - cos * .715 + sin * .715) * green
+                    + (.072 + cos * .928 + sin * .072) * blue;
+                pixels[index + 2] = (byte)Math.Clamp(hueRed * 255, 0, 255);
+                pixels[index + 1] = (byte)Math.Clamp(hueGreen * 255, 0, 255);
+                pixels[index] = (byte)Math.Clamp(hueBlue * 255, 0, 255);
+                alpha[y * converted.PixelWidth + x] = (byte)Math.Clamp(
+                    pixels[index + 3] * options.ForegroundOpacity,
+                    0,
+                    255);
+            }
+        }
+        alpha = ExpandAlpha(alpha, converted.PixelWidth, converted.PixelHeight, options.MaskExpansion);
+        for (var y = 0; y < converted.PixelHeight; y++)
+        {
+            for (var x = 0; x < converted.PixelWidth; x++)
+            {
+                pixels[y * stride + x * 4 + 3] = alpha[y * converted.PixelWidth + x];
+            }
+        }
+        return CreateBitmap(converted, pixels, stride);
+    }
+
+    private static byte[] ExpandAlpha(byte[] source, int width, int height, int amount)
+    {
+        var radius = Math.Clamp(Math.Abs(amount), 0, 12);
+        if (radius == 0)
+        {
+            return source;
+        }
+        var result = new byte[source.Length];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var value = amount > 0 ? byte.MinValue : byte.MaxValue;
+                for (var dy = -radius; dy <= radius; dy++)
+                {
+                    for (var dx = -radius; dx <= radius; dx++)
+                    {
+                        var sampleX = Math.Clamp(x + dx, 0, width - 1);
+                        var sampleY = Math.Clamp(y + dy, 0, height - 1);
+                        var sample = source[sampleY * width + sampleX];
+                        value = amount > 0 ? Math.Max(value, sample) : Math.Min(value, sample);
+                    }
+                }
+                result[y * width + x] = value;
+            }
+        }
+        return result;
+    }
+
+    private static (int Width, int Height) CanvasSize(int width, int height, CanvasAspect aspect)
+    {
+        if (aspect == CanvasAspect.Original)
+        {
+            return (width, height);
+        }
+        var ratio = aspect switch
+        {
+            CanvasAspect.Square => 1.0,
+            CanvasAspect.Portrait45 => 4.0 / 5,
+            CanvasAspect.Landscape169 => 16.0 / 9,
+            _ => (double)width / height
+        };
+        if ((double)width / height > ratio)
+        {
+            return ((int)Math.Round(height * ratio), height);
+        }
+        return (width, (int)Math.Round(width / ratio));
     }
 
     private static BitmapSource CreateMask(BitmapSource source)

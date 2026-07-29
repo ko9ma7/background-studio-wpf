@@ -33,7 +33,18 @@ public sealed class ImageComposerTests
                 0,
                 true,
                 2,
-                "#112233");
+                "#112233",
+                1.1,
+                1.2,
+                1.15,
+                0.1,
+                10,
+                0.9,
+                12,
+                true,
+                false,
+                -1,
+                CanvasAspect.Square);
             var result = ImageComposer.Compose(source, source, options, null);
             var temp = Path.Combine(Path.GetTempPath(), $"background-studio-{Guid.NewGuid():N}");
             Directory.CreateDirectory(temp);
