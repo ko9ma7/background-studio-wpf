@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>BackgroundStudio</AssemblyName>
+    <RootNamespace>BackgroundStudio</RootNamespace>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.28.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Tests\**\*.cs;obj\**\*.cs;bin\**\*.cs" />
+    <None Remove="obj\**\*;bin\**\*" />
+    <Page Remove="obj\**\*.xaml;bin\**\*.xaml" />
+    <ApplicationDefinition Remove="obj\**\*.xaml;bin\**\*.xaml" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BackgroundStudio'">
+    <BaseIntermediateOutputPath>obj\app\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>obj\app\</MSBuildProjectExtensionsPath>
+    <BaseOutputPath>bin\app\</BaseOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BackgroundStudio.Tests'">
+    <BaseIntermediateOutputPath>obj\tests\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>obj\tests\</MSBuildProjectExtensionsPath>
+    <BaseOutputPath>bin\tests\</BaseOutputPath>
+  </PropertyGroup>
+</Project>
