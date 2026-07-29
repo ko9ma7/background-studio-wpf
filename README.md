@@ -6,12 +6,13 @@ Windows에서 이미지와 동영상 배경을 로컬로 제거하고 편집하�
 ## 기능
 
 - U2NetP ONNX 모델을 앱에서 내려받고 MD5 체크섬 검증
-- 이미지 배경 제거, 투명 PNG 저장
+- 이미지 배경 제거와 PNG/JPEG/BMP/TIFF/SVG 저장
 - 단색·다른 이미지·원본 블러 배경 합성
 - 마스크 기준과 가장자리 부드러움 조정
 - 그림자 흐림·불투명도·오프셋
-- FFmpeg가 있으면 동영상 프레임 처리
-- 투명 WebM(VP9 alpha) 또는 합성 MP4(H.264)
+- 중앙 정렬·크기·X/Y 위치, 7종 필터, 마스크·외곽선 단독 레이어
+- SHA-256 검증을 거친 FFmpeg 8.1.2 앱 내부 자동 준비
+- 투명 WebM/MOV 또는 MP4/WebM/MOV/GIF
 - 취소, 진행률, 모델/FFmpeg 누락 상태, 키보드 포커스
 
 ## 실행
@@ -26,18 +27,17 @@ dotnet run --project BackgroundStudio.csproj
 첫 화면의 `모델 준비`를 누르면 rembg가 배포하는 U2NetP 모델 약 5MB를
 `%LOCALAPPDATA%\BackgroundStudio\models\`에 저장합니다.
 
-동영상을 처리하려면 [FFmpeg](https://ffmpeg.org/download.html)를 별도로
-설치하고 `ffmpeg` 명령이 PATH에서 실행되어야 합니다. 모델과 FFmpeg는
-라이선스와 용량 때문에 앱 설치 파일에 몰래 포함하지 않습니다.
+동영상에서는 상단 `FFmpeg 준비`를 누르거나 바로 처리를 시작하면 검증된
+Essentials ZIP을 `%LOCALAPPDATA%\BackgroundStudio\ffmpeg\`에 내려받습니다.
+시스템 PATH 설정이나 관리자 권한은 필요하지 않습니다.
 
 ## 사용 순서
 
 1. 이미지 또는 동영상을 엽니다.
 2. 투명·단색·다른 이미지·블러 중 결과 배경 하나를 고릅니다.
-3. 필요한 경우 마스크 기준과 가장자리 부드러움을 조절합니다.
+3. 필터, 출력 레이어, 중앙 정렬, 크기와 위치를 조절합니다.
 4. `배경 제거 시작`을 누릅니다.
-5. 이미지 미리보기를 확인한 뒤 PNG로 저장합니다. 동영상은 시작할 때
-   WebM 또는 MP4 저장 위치를 선택합니다.
+5. 이미지는 PNG/JPEG/BMP/TIFF/SVG, 동영상은 MP4/WebM/MOV/GIF로 저장합니다.
 
 ## 빌드와 테스트
 
@@ -57,6 +57,8 @@ dotnet test BackgroundStudio.Tests.csproj --configuration Release
 
 외부 구성요소는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), 디자인
 판단은 [`docs/design-direction.md`](docs/design-direction.md)에 정리했습니다.
+전문 편집값은 [`docs/pro-editing-guide.md`](docs/pro-editing-guide.md)를
+확인하세요.
 
 ## License
 

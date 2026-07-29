@@ -7,6 +7,7 @@
     <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
     <EnableDefaultPageItems>false</EnableDefaultPageItems>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
@@ -17,7 +18,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Core\MaskMath.cs" />
-    <Compile Include="Tests\MaskMathTests.cs" />
+    <ProjectReference Include="BackgroundStudio.csproj" />
+    <Compile Include="Tests\*.cs" />
   </ItemGroup>
 </Project>

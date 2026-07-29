@@ -9,4 +9,12 @@ public sealed record EditOptions(
     double ShadowOffsetX,
     double ShadowOffsetY,
     double MaskThreshold,
-    double EdgeSoftness);
+    double EdgeSoftness,
+    ForegroundFilter ForegroundFilter,
+    RenderMode RenderMode,
+    double SubjectScale,
+    double SubjectOffsetX,
+    double SubjectOffsetY,
+    bool AutoCenter,
+    int OutlineWidth,
+    string OutlineColor);
