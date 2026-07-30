@@ -11,6 +11,54 @@ namespace BackgroundStudio.Services;
 
 public static class ImageComposer
 {
+    public static BitmapSource ApplyMaskStrokes(
+        BitmapSource cutout,
+        IReadOnlyList<MaskStroke> strokes)
+    {
+        var source = ConvertToBgra32(cutout);
+        if (strokes.Count == 0)
+        {
+            return source;
+        }
+        var stride = source.PixelWidth * 4;
+        var original = new byte[stride * source.PixelHeight];
+        source.CopyPixels(original, stride, 0);
+        var pixels = (byte[])original.Clone();
+        foreach (var stroke in strokes)
+        {
+            if (stroke.Points.Count == 0)
+            {
+                continue;
+            }
+            var radius = Math.Max(1, stroke.Radius * Math.Min(source.PixelWidth, source.PixelHeight));
+            var previous = stroke.Points[0];
+            PaintMaskCircle(pixels, original, stride, source, stroke.Tool, previous, radius);
+            foreach (var point in stroke.Points.Skip(1))
+            {
+                var distance = Math.Sqrt(
+                    Math.Pow((point.X - previous.X) * source.PixelWidth, 2)
+                    + Math.Pow((point.Y - previous.Y) * source.PixelHeight, 2));
+                var steps = Math.Max(1, (int)Math.Ceiling(distance / Math.Max(1, radius * 0.45)));
+                for (var step = 1; step <= steps; step++)
+                {
+                    var amount = step / (double)steps;
+                    PaintMaskCircle(
+                        pixels,
+                        original,
+                        stride,
+                        source,
+                        stroke.Tool,
+                        new MaskPoint(
+                            previous.X + (point.X - previous.X) * amount,
+                            previous.Y + (point.Y - previous.Y) * amount),
+                        radius);
+                }
+                previous = point;
+            }
+        }
+        return CreateBitmap(source, pixels, stride);
+    }
+
     public static BitmapSource Compose(
         BitmapSource original,
         BitmapSource cutout,
@@ -577,6 +625,47 @@ public static class ImageComposer
             stride);
         result.Freeze();
         return result;
+    }
+
+    private static void PaintMaskCircle(
+        byte[] pixels,
+        byte[] original,
+        int stride,
+        BitmapSource source,
+        MaskTool tool,
+        MaskPoint point,
+        double radius)
+    {
+        var centerX = point.X * source.PixelWidth;
+        var centerY = point.Y * source.PixelHeight;
+        var left = Math.Max(0, (int)Math.Floor(centerX - radius));
+        var right = Math.Min(source.PixelWidth - 1, (int)Math.Ceiling(centerX + radius));
+        var top = Math.Max(0, (int)Math.Floor(centerY - radius));
+        var bottom = Math.Min(source.PixelHeight - 1, (int)Math.Ceiling(centerY + radius));
+        var radiusSquared = radius * radius;
+        for (var y = top; y <= bottom; y++)
+        {
+            for (var x = left; x <= right; x++)
+            {
+                if (Math.Pow(x + 0.5 - centerX, 2) + Math.Pow(y + 0.5 - centerY, 2)
+                    > radiusSquared)
+                {
+                    continue;
+                }
+                var index = y * stride + x * 4;
+                if (tool == MaskTool.Erase)
+                {
+                    pixels[index] = 0;
+                    pixels[index + 1] = 0;
+                    pixels[index + 2] = 0;
+                    pixels[index + 3] = 0;
+                }
+                else
+                {
+                    Array.Copy(original, index, pixels, index, 4);
+                }
+            }
+        }
     }
 
     private static byte Scale(byte value, double scale, double offset) =>

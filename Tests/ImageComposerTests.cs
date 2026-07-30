@@ -11,6 +11,48 @@ namespace BackgroundStudio.Tests;
 public sealed class ImageComposerTests
 {
     [Fact]
+    public void ManualMaskEraseAndRestoreReplayFromAiCutout()
+    {
+        RunSta(() =>
+        {
+            var source = CreateCutout();
+            var erased = ImageComposer.ApplyMaskStrokes(
+                source,
+                [
+                    new MaskStroke(
+                        MaskTool.Erase,
+                        0.2,
+                        [new MaskPoint(0.2, 0.5)])
+                ]);
+            Assert.Equal(0, AlphaAt(erased, 4, 5));
+
+            var restored = ImageComposer.ApplyMaskStrokes(
+                source,
+                [
+                    new MaskStroke(
+                        MaskTool.Erase,
+                        0.2,
+                        [new MaskPoint(0.2, 0.5)]),
+                    new MaskStroke(
+                        MaskTool.Restore,
+                        0.1,
+                        [new MaskPoint(0.2, 0.5)])
+                ]);
+            Assert.Equal(255, AlphaAt(restored, 4, 5));
+        });
+    }
+
+    [Fact]
+    public void CompletedQueueJobsStayCompletedWhenNewJobIsAdded()
+    {
+        var saved = new BatchJob("saved.png", false) { Status = "완료 · 자동 저장됨" };
+        var pending = new BatchJob("new.png", false);
+
+        Assert.False(saved.IsRunnable);
+        Assert.True(pending.IsRunnable);
+    }
+
+    [Fact]
     public void ComposerSupportsTransformMaskOutlineAndRasterFormats()
     {
         RunSta(() =>
@@ -98,6 +140,13 @@ public sealed class ImageComposerTests
             width * 4);
         result.Freeze();
         return result;
+    }
+
+    private static byte AlphaAt(BitmapSource source, int x, int y)
+    {
+        var pixels = new byte[source.PixelWidth * source.PixelHeight * 4];
+        source.CopyPixels(pixels, source.PixelWidth * 4, 0);
+        return pixels[(y * source.PixelWidth + x) * 4 + 3];
     }
 
     private static void RunSta(Action action)

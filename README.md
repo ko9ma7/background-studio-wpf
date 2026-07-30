@@ -1,4 +1,4 @@
-# Background Studio · C# WPF 1.3
+# Background Studio · C# WPF 1.4
 
 Windows에서 이미지와 동영상 배경을 로컬로 제거하고 편집하는 .NET 10 WPF
 앱입니다. 파일은 외부 AI API로 전송하지 않습니다.
@@ -19,11 +19,14 @@ Windows에서 이미지와 동영상 배경을 로컬로 제거하고 편집하�
 - 자동 결과 저장, 출력 폴더·선택 결과 열기, 모델/FFmpeg 상태
 - 선택 작업마다 분리 원본에서 다시 계산하는 비파괴 편집 히스토리
 - 초기 상태·필터·위치·색·마스크 기록을 클릭해 즉시 비교
+- 세로·대형 이미지 맞춤 보기, 포인터 중심 휠 줌, 손 도구 이동, 100% 보기
+- AI 분리 결과용 지우기·복원 브러시와 마스크 실행 취소
+- 완료 항목을 건드리지 않는 신규·오류·편집 변경 작업 전용 일괄 변환
 
 ## Windows EXE
 
 [GitHub Releases](https://github.com/ko9ma7/background-studio-wpf/releases)에서
-`BackgroundStudio-WPF-v1.3.0-win-x64.zip`을 내려받아 압축을 풀고
+`BackgroundStudio-WPF-v1.4.0-win-x64.zip`을 내려받아 압축을 풀고
 `BackgroundStudio.exe`를 실행합니다. 이 배포본은 .NET 런타임을 포함하므로
 .NET SDK나 FFmpeg를 따로 설치할 필요가 없습니다. ZIP 옆의 `.sha256` 파일로
 다운로드 무결성을 확인할 수 있습니다.
@@ -50,8 +53,9 @@ Essentials ZIP을 `%LOCALAPPDATA%\BackgroundStudio\ffmpeg\`에 내려받습니�
 2. 투명·단색·다른 이미지·블러 중 결과 배경 하나를 고릅니다.
 3. 상단 탭에서 필터·외곽, 위치·크기, 고급 색·마스크 값을 조절합니다.
 4. 미리보기 아래 `편집 히스토리`에서 이전 상태를 클릭해 비교합니다.
-5. `대기열 전체 변환`을 누릅니다.
-6. 완료 파일은 `사진\Background Studio`에 자동 저장되고 결과 목록에 남습니다.
+5. `맞춤`, 휠 줌, 손 도구와 필요 시 지우기·복원 브러시로 경계를 확인합니다.
+6. `대기열 전체 변환`을 누릅니다.
+7. 완료 파일은 `사진\Background Studio`에 자동 저장되고 결과 목록에 남습니다.
 
 저장 대화상자를 처리 도중 열지 않습니다. `저장·결과` 탭에서 출력 폴더를
 바꾸고, 선택 결과 또는 폴더를 바로 열 수 있습니다. 새 작업은 `전체 초기화`,
@@ -68,11 +72,11 @@ dotnet build BackgroundStudio.csproj --configuration Release
 dotnet test BackgroundStudio.Tests.csproj --configuration Release
 ```
 
-배포용 단일 EXE:
+배포용 self-contained 폴더:
 
 ```powershell
 dotnet publish BackgroundStudio.csproj -c Release -r win-x64 `
-  --self-contained true -p:PublishSingleFile=true
+  --self-contained true
 ```
 
 ## 현실적인 제한

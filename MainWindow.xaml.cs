@@ -35,6 +35,12 @@ public partial class MainWindow : Window
     private bool closeRequested;
     private bool isApplyingHistory;
     private DateTime suppressEditPreviewUntil;
+    private double previewZoom = 1;
+    private Point previewOffset;
+    private MaskTool? previewMaskTool;
+    private List<MaskPoint>? activeMaskPoints;
+    private Point? panStart;
+    private Point panOrigin;
 
     public MainWindow()
     {
@@ -195,7 +201,14 @@ public partial class MainWindow : Window
 
     private void SelectJob(BatchJob job)
     {
+        var changedJob = selectedJob != job;
         selectedJob = job;
+        if (changedJob)
+        {
+            FitPreview();
+            previewMaskTool = null;
+            activeMaskPoints = null;
+        }
         SourceNameText.Text = job.Name;
         BindHistory(job);
         if (job.History.Selected is not null)
@@ -261,6 +274,9 @@ public partial class MainWindow : Window
         editPreviewTimer.Stop();
         previewResult = null;
         PreviewImage.Source = null;
+        FitPreview();
+        previewMaskTool = null;
+        activeMaskPoints = null;
         HistoryPanel.Visibility = Visibility.Collapsed;
         HistoryList.ItemsSource = null;
         SourceNameText.Text = "대기열에서 파일을 선택하세요.";
@@ -282,9 +298,7 @@ public partial class MainWindow : Window
 
     private async void Process_Click(object sender, RoutedEventArgs e)
     {
-        var pending = jobs.Where(job =>
-            job.Status.StartsWith("대기", StringComparison.Ordinal)
-            || job.Status.StartsWith("오류", StringComparison.Ordinal)).ToArray();
+        var pending = jobs.Where(job => job.IsRunnable).ToArray();
         if (pending.Length == 0)
         {
             StatusText.Text = "처리할 대기 작업이 없습니다. 완료 작업은 '선택 작업 다시 대기'로 재처리할 수 있습니다.";
@@ -376,13 +390,14 @@ public partial class MainWindow : Window
         var cutout = job.Cutout ?? await Task.Run(
             () => engine.Remove(original, options.MaskThreshold, options.EdgeSoftness),
             token);
-        var composed = ImageComposer.Compose(original, cutout, options, background);
+        var editedCutout = ImageComposer.ApplyMaskStrokes(cutout, job.MaskStrokes);
+        var composed = ImageComposer.Compose(original, editedCutout, options, background);
         var extension = SelectedTag(ImageFormatCombo);
         var output = UniqueOutputPath(job.SourcePath, extension);
         if (extension == "svg")
         {
             ImageComposer.SaveSvgOutline(
-                ImageComposer.PrepareForeground(cutout, options),
+                ImageComposer.PrepareForeground(editedCutout, options),
                 output,
                 options.OutlineColor,
                 options.OutlineWidth);
@@ -544,7 +559,8 @@ public partial class MainWindow : Window
             var background = state.BackgroundPath is null
                 ? null
                 : ImageComposer.Load(state.BackgroundPath);
-            var composed = ImageComposer.Compose(job.Original, job.Cutout, state.Options, background);
+            var editedCutout = ImageComposer.ApplyMaskStrokes(job.Cutout, job.MaskStrokes);
+            var composed = ImageComposer.Compose(job.Original, editedCutout, state.Options, background);
             job.Preview = composed;
             previewResult = composed;
             PreviewImage.Source = composed;
@@ -573,6 +589,284 @@ public partial class MainWindow : Window
         job.OutputPath = null;
         results.Remove(job);
         RefreshActions();
+    }
+
+    private void ZoomIn_Click(object sender, RoutedEventArgs e) =>
+        ZoomPreview(1.25, new Point(PreviewHost.ActualWidth / 2, PreviewHost.ActualHeight / 2));
+
+    private void ZoomOut_Click(object sender, RoutedEventArgs e) =>
+        ZoomPreview(1 / 1.25, new Point(PreviewHost.ActualWidth / 2, PreviewHost.ActualHeight / 2));
+
+    private void FitPreview_Click(object sender, RoutedEventArgs e) => FitPreview();
+
+    private void ActualSize_Click(object sender, RoutedEventArgs e)
+    {
+        var fitScale = PreviewFitScale();
+        if (fitScale <= 0)
+        {
+            return;
+        }
+        previewZoom = 1 / fitScale;
+        previewOffset = default;
+        ApplyPreviewTransform();
+    }
+
+    private void HandTool_Click(object sender, RoutedEventArgs e) => SetPreviewTool(null);
+
+    private void EraseTool_Click(object sender, RoutedEventArgs e) => SetPreviewTool(MaskTool.Erase);
+
+    private void RestoreTool_Click(object sender, RoutedEventArgs e) => SetPreviewTool(MaskTool.Restore);
+
+    private void SetPreviewTool(MaskTool? tool)
+    {
+        if (tool is not null
+            && (selectedJob is null || selectedJob.IsVideo || selectedJob.Cutout is null))
+        {
+            StatusText.Text = "지우기·복원 브러시는 배경 분리가 끝난 이미지에서 사용할 수 있습니다.";
+            return;
+        }
+        previewMaskTool = tool;
+        activeMaskPoints = null;
+        PreviewHost.Cursor = tool is null ? Cursors.Hand : Cursors.Cross;
+        RefreshToolPreview();
+        StatusText.Text = tool is null
+            ? "휠로 포인터 위치를 확대하고 드래그로 화면을 이동합니다."
+            : "분리 원본 위를 칠해 남은 배경을 지우거나 피사체를 복원합니다.";
+    }
+
+    private void UndoMask_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedJob?.MaskStrokes.Count is not > 0)
+        {
+            return;
+        }
+        selectedJob.MaskStrokes.RemoveAt(selectedJob.MaskStrokes.Count - 1);
+        MarkMaskChanged(selectedJob);
+        RefreshToolPreview();
+    }
+
+    private void PreviewHost_MouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        ZoomPreview(e.Delta > 0 ? 1.25 : 1 / 1.25, e.GetPosition(PreviewHost));
+        e.Handled = true;
+    }
+
+    private void ZoomPreview(double factor, Point point)
+    {
+        if (PreviewImage.Source is null)
+        {
+            return;
+        }
+        var previous = previewZoom;
+        previewZoom = Math.Clamp(previewZoom * factor, 0.05, 32);
+        var ratio = previewZoom / previous;
+        previewOffset = new Point(
+            point.X - (point.X - previewOffset.X) * ratio,
+            point.Y - (point.Y - previewOffset.Y) * ratio);
+        ApplyPreviewTransform();
+    }
+
+    private void FitPreview()
+    {
+        previewZoom = 1;
+        previewOffset = default;
+        ApplyPreviewTransform();
+    }
+
+    private void ApplyPreviewTransform()
+    {
+        PreviewScale.ScaleX = previewZoom;
+        PreviewScale.ScaleY = previewZoom;
+        PreviewTranslate.X = previewOffset.X;
+        PreviewTranslate.Y = previewOffset.Y;
+        var shown = PreviewFitScale() * previewZoom * 100;
+        ZoomText.Text = previewZoom == 1 && previewOffset == default
+            ? "맞춤"
+            : $"{shown:0}%";
+    }
+
+    private double PreviewFitScale()
+    {
+        if (PreviewImage.Source is not BitmapSource source
+            || PreviewHost.ActualWidth <= 0
+            || PreviewHost.ActualHeight <= 0)
+        {
+            return 0;
+        }
+        return Math.Min(
+            PreviewHost.ActualWidth / source.PixelWidth,
+            PreviewHost.ActualHeight / source.PixelHeight);
+    }
+
+    private void PreviewHost_SizeChanged(object sender, SizeChangedEventArgs e) =>
+        ApplyPreviewTransform();
+
+    private void PreviewHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (previewMaskTool is null)
+        {
+            BeginPan(e);
+            return;
+        }
+        if (selectedJob?.Cutout is null)
+        {
+            return;
+        }
+        var point = MaskPointAt(e.GetPosition(PreviewHost), selectedJob.Cutout);
+        if (point is not null)
+        {
+            activeMaskPoints = [point.Value];
+            PreviewHost.CaptureMouse();
+            e.Handled = true;
+        }
+    }
+
+    private void PreviewHost_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (panStart is not null && e.LeftButton == MouseButtonState.Pressed
+            || panStart is not null && e.MiddleButton == MouseButtonState.Pressed)
+        {
+            var point = e.GetPosition(PreviewHost);
+            previewOffset = new Point(
+                panOrigin.X + point.X - panStart.Value.X,
+                panOrigin.Y + point.Y - panStart.Value.Y);
+            ApplyPreviewTransform();
+            return;
+        }
+        if (activeMaskPoints is null
+            || selectedJob?.Cutout is null
+            || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+        var maskPoint = MaskPointAt(e.GetPosition(PreviewHost), selectedJob.Cutout);
+        if (maskPoint is not null)
+        {
+            activeMaskPoints.Add(maskPoint.Value);
+            RefreshToolPreview();
+        }
+    }
+
+    private void PreviewHost_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (previewMaskTool is null)
+        {
+            EndPan();
+            return;
+        }
+        if (selectedJob?.Cutout is null || activeMaskPoints is not { Count: > 0 })
+        {
+            activeMaskPoints = null;
+            return;
+        }
+        var point = MaskPointAt(e.GetPosition(PreviewHost), selectedJob.Cutout);
+        if (point is not null)
+        {
+            activeMaskPoints.Add(point.Value);
+        }
+        selectedJob.MaskStrokes.Add(new MaskStroke(
+            previewMaskTool.Value,
+            BrushSizeSlider.Value / 2 / Math.Min(
+                selectedJob.Cutout.PixelWidth,
+                selectedJob.Cutout.PixelHeight),
+            [.. activeMaskPoints]));
+        activeMaskPoints = null;
+        MarkMaskChanged(selectedJob);
+        RefreshToolPreview();
+        PreviewHost.ReleaseMouseCapture();
+        e.Handled = true;
+    }
+
+    private void PreviewHost_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Middle)
+        {
+            BeginPan(e);
+        }
+    }
+
+    private void PreviewHost_MouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Middle)
+        {
+            EndPan();
+        }
+    }
+
+    private void BeginPan(MouseButtonEventArgs e)
+    {
+        panStart = e.GetPosition(PreviewHost);
+        panOrigin = previewOffset;
+        PreviewHost.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void EndPan()
+    {
+        panStart = null;
+        PreviewHost.ReleaseMouseCapture();
+    }
+
+    private MaskPoint? MaskPointAt(Point point, BitmapSource source)
+    {
+        var localX = (point.X - previewOffset.X) / previewZoom;
+        var localY = (point.Y - previewOffset.Y) / previewZoom;
+        var fit = Math.Min(
+            PreviewHost.ActualWidth / source.PixelWidth,
+            PreviewHost.ActualHeight / source.PixelHeight);
+        var width = source.PixelWidth * fit;
+        var height = source.PixelHeight * fit;
+        var x = (localX - (PreviewHost.ActualWidth - width) / 2) / width;
+        var y = (localY - (PreviewHost.ActualHeight - height) / 2) / height;
+        return x is >= 0 and <= 1 && y is >= 0 and <= 1
+            ? new MaskPoint(x, y)
+            : null;
+    }
+
+    private void MarkMaskChanged(BatchJob job)
+    {
+        job.Status = "대기 · 마스크 보정";
+        job.Progress = 0;
+        job.OutputPath = null;
+        results.Remove(job);
+        UndoMaskButton.IsEnabled = job.MaskStrokes.Count > 0;
+        RefreshActions();
+    }
+
+    private void RefreshToolPreview()
+    {
+        if (selectedJob?.Cutout is null || selectedJob.Original is null)
+        {
+            return;
+        }
+        var strokes = selectedJob.MaskStrokes.ToList();
+        if (previewMaskTool is not null && activeMaskPoints is { Count: > 0 })
+        {
+            strokes.Add(new MaskStroke(
+                previewMaskTool.Value,
+                BrushSizeSlider.Value / 2 / Math.Min(
+                    selectedJob.Cutout.PixelWidth,
+                    selectedJob.Cutout.PixelHeight),
+                [.. activeMaskPoints]));
+        }
+        var cutout = ImageComposer.ApplyMaskStrokes(selectedJob.Cutout, strokes);
+        if (previewMaskTool is not null)
+        {
+            PreviewImage.Source = cutout;
+        }
+        else
+        {
+            var background = backgroundPath is null ? null : ImageComposer.Load(backgroundPath);
+            PreviewImage.Source = ImageComposer.Compose(
+                selectedJob.Original,
+                cutout,
+                CurrentOptions(),
+                background);
+        }
+        previewResult = PreviewImage.Source as BitmapSource;
+        EmptyState.Visibility = Visibility.Collapsed;
+        UndoMaskButton.IsEnabled = selectedJob.MaskStrokes.Count > 0;
+        ApplyPreviewTransform();
     }
 
     private void BindHistory(BatchJob job)
@@ -797,9 +1091,7 @@ public partial class MainWindow : Window
         }
         ProcessButton.IsEnabled = !isBusy
             && modelManager.IsReady
-            && jobs.Any(job =>
-                job.Status.StartsWith("대기", StringComparison.Ordinal)
-                || job.Status.StartsWith("오류", StringComparison.Ordinal));
+            && jobs.Any(job => job.IsRunnable);
         RequeueButton.IsEnabled = !isBusy && selectedJob is not null;
         RemoveSelectedButton.IsEnabled = !isBusy && selectedJob is not null;
         ClearQueueButton.IsEnabled = !isBusy && jobs.Count > 0;
@@ -854,8 +1146,12 @@ public sealed class BatchJob(string sourcePath, bool isVideo) : INotifyPropertyC
     public string Name { get; } = Path.GetFileName(sourcePath);
     public bool IsVideo { get; } = isVideo;
     public EditHistory History { get; } = new();
+    public List<MaskStroke> MaskStrokes { get; } = [];
     public BitmapSource? Original { get; set; }
     public BitmapSource? Cutout { get; set; }
+    public bool IsRunnable =>
+        Status.StartsWith("대기", StringComparison.Ordinal)
+        || Status.StartsWith("오류", StringComparison.Ordinal);
 
     public string Status
     {

@@ -124,16 +124,60 @@
           <Border Grid.Row="1" Margin="0,14,0,0" Background="White" CornerRadius="14"
                   BorderBrush="#D9DFDB" BorderThickness="1">
             <Grid>
-              <Image x:Name="PreviewImage" Stretch="Uniform" Margin="16" />
-              <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock Text="이미지나 동영상을 대기열에 추가하세요" FontSize="19" FontWeight="SemiBold"
-                           HorizontalAlignment="Center" />
-                <TextBlock Text="처리 완료 결과는 자동으로 출력 폴더에 저장됩니다."
-                           Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" />
-              </StackPanel>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <WrapPanel Margin="9,8,9,7" VerticalAlignment="Center">
+                <Button Content="−" Width="34" Click="ZoomOut_Click" />
+                <TextBlock x:Name="ZoomText" Text="맞춤" Width="58"
+                           TextAlignment="Center" VerticalAlignment="Center" />
+                <Button Content="+" Width="34" Click="ZoomIn_Click" />
+                <Button Content="맞춤" Margin="6,0,0,0" Click="FitPreview_Click" />
+                <Button Content="100%" Margin="4,0,0,0" Click="ActualSize_Click" />
+                <Button x:Name="HandToolButton" Content="손" Margin="12,0,0,0"
+                        Click="HandTool_Click" />
+                <Button x:Name="EraseToolButton" Content="지우기" Margin="4,0,0,0"
+                        Click="EraseTool_Click" />
+                <Button x:Name="RestoreToolButton" Content="복원" Margin="4,0,0,0"
+                        Click="RestoreTool_Click" />
+                <TextBlock Text="브러시" Margin="12,0,4,0" VerticalAlignment="Center" />
+                <Slider x:Name="BrushSizeSlider" Width="90" Minimum="4" Maximum="160"
+                        Value="36" VerticalAlignment="Center" />
+                <Button x:Name="UndoMaskButton" Content="마스크 실행 취소" Margin="7,0,0,0"
+                        Click="UndoMask_Click" IsEnabled="False" />
+              </WrapPanel>
+              <Grid x:Name="PreviewHost"
+                    Grid.Row="1"
+                    Margin="10,0,10,10"
+                    Background="{StaticResource CanvasBrush}"
+                    ClipToBounds="True"
+                    MouseWheel="PreviewHost_MouseWheel"
+                    MouseLeftButtonDown="PreviewHost_MouseLeftButtonDown"
+                    MouseLeftButtonUp="PreviewHost_MouseLeftButtonUp"
+                    MouseMove="PreviewHost_MouseMove"
+                    MouseDown="PreviewHost_MouseDown"
+                    MouseUp="PreviewHost_MouseUp"
+                    SizeChanged="PreviewHost_SizeChanged">
+                <Image x:Name="PreviewImage" Stretch="Uniform">
+                  <Image.RenderTransform>
+                    <TransformGroup>
+                      <ScaleTransform x:Name="PreviewScale" ScaleX="1" ScaleY="1" />
+                      <TranslateTransform x:Name="PreviewTranslate" />
+                    </TransformGroup>
+                  </Image.RenderTransform>
+                </Image>
+                <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center">
+                  <TextBlock Text="이미지나 동영상을 대기열에 추가하세요" FontSize="19" FontWeight="SemiBold"
+                             HorizontalAlignment="Center" />
+                  <TextBlock Text="처리 완료 결과는 자동으로 출력 폴더에 저장됩니다."
+                             Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" />
+                </StackPanel>
+              </Grid>
               <Border x:Name="HistoryPanel"
-                      VerticalAlignment="Bottom"
-                      Margin="12"
+                      Grid.Row="2"
+                      Margin="10,0,10,10"
                       Padding="10"
                       CornerRadius="12"
                       BorderBrush="#B7C9BF"
